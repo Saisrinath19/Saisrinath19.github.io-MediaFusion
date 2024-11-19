@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Scraper Controls - {{ addon_name }} Stremio Addon</title>
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/css/bootstrap-icons.css" rel="stylesheet">
+    <link href="/static/css/styles.css" rel="stylesheet">
+    <link href="/static/css/toastr.min.css" rel="stylesheet"/>
+    <link rel="shortcut icon" href="{{ logo_url }}" type="image/x-icon">
+</head>
+
+<body>
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-10 col-lg-10 col-md-8 col-sm-10 config-container">
+            <a href="/"><img class="logo" src="{{ logo_url }}"></a>
+            <h3 class="text-center mb-5"><b>Scraper Controls</b> - Manage Scraping Tasks</h3>
+
+            <!-- Scraper Selection -->
+            <div class="section-container">
+                <h4 class="section-header">Scraper Selection</h4>
+                <hr class="section-divider">
+                <div class="mb-3">
+                    <label for="scraperSelect" class="form-label">Select Scraper</label>
+                    <select class="form-select" id="scraperSelect" onchange="updateFormFields()">
+                        <option value="add_torrent">Add Torrent Data</option>
+                        <option value="scrapy">Trigger Scrapy Spider</option>
+                        <option value="add_tv_metadata">Add TV Metadata</option>
+                        <option value="add_m3u_playlist">Add M3U Playlist</option>
+                        <option value="update_imdb_data">Update IMDb Data</option>
+                        <option value="block_torrent">Block Torrent</option>
+                    </select>
+                </div>
+
+                <!-- Dynamic Scraper Parameters -->
+                <div id="scraperParameters">
+                    <!-- Torrent Upload Parameters -->
+                    <div id="torrentUploadParameters" style="display: none;">
+                        <div class="mb-3">
+                            <label for="torrentImdbId" class="form-label">IMDb ID</label>
+                            <input type="text" class="form-control" id="torrentImdbId" name="meta_id" maxlength="10" placeholder="Enter IMDb ID (e.g., tt1234567)"
+                                   value="{% if prefill_data.meta_id %}{{ prefill_data.meta_id }}{% endif %}">
+                        </div>
+                        <div class="mb-3">
+                            <label for="metaType" class="form-label">Meta Type</label>
+                            <select class="form-select" id="metaType" name="meta_type" onchange="updateMetaType()">
+                                <option value="movie" {% if prefill_data.meta_type == 'movie' %}selected{% endif %}>Movie</option>
+                                <option value="series" {% if prefill_data.meta_type == 'series' %}selected{% endif %}>Series</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="source" class="form-label">Source</label>
+                            <input type="text" class="form-control" id="source" name="source" placeholder="Enter Source Name Where Torrent was Found or Uploader Name" maxlength="20">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Catalogs</label>
+                            <div class="row">
+                                <div id="catalogsMovie" style="display: none;">
+                                    <div class="row">
+                                        {% for catalog in supported_movie_catalog_ids %}
+                                            <div class="col-12 col-md-6 col-lg-4">
+                                                <div class="form-check mb-2">
+                                                    <input class="form-check-input" type="checkbox" id="catalogMovie{{ loop.index }}" name="catalogs" value="{{ catalog }}">
+                                                    <label class="form-check-label" for="catalogMovie{{ loop.index }}">{{ catalog_data.get(catalog) }}</label>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                <div id="catalogsSeries" style="display: none;">
+                                    <div class="row">
+                                        {% for catalog in supported_series_catalog_ids %}
+                                            <div class="col-12 col-md-6 col-lg-4">
+                                                <div class="form-check mb-2">
+                                                    <input class="form-check-input" type="checkbox" id="catalogSeries{{ loop.index }}" name="catalogs" value="{{ catalog }}">
+                                                    <label class="form-check-label" for="catalogSeries{{ loop.index }}">{{ catalog_data.get(catalog) }}</label>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="createdAt" class="form-label">Created At</label>
+                            <input type="date" class="form-control" id="createdAt" name="created_at">
+                        </div>
+                        <div class="mb-3" id="seriesParameters" style="display: none;">
+                            <label for="season" class="form-label">Season</label>
+                            <input type="number" class="form-control" id="season" name="season" value="{% if prefill_data.season %}{{ prefill_data.season }}{% endif %}">
+                            <label for="episodes" class="form-label">Episodes</label>
+                            <input type="text" class="form-control" id="episodes" name="episodes" value="{% if prefill_data.episode %}{{ prefill_data.episode }}{% endif %}"
+                                   placeholder="Comma-separated list of episodes or Range of episodes or Single episode number (e.g., 1-5 | 1, 2, 3 | 1)">
+                        </div>
+                        <div class="mb-3">
+                            <label for="magnetLink" class="form-label">Magnet Link</label>
+                            <input type="url" class="form-control" id="magnetLink" name="magnet_link" oninput="toggleInput('torrentFile', this)">
+                        </div>
+                        <div class="mb-3">
+                            <label for="torrentFile" class="form-label">Torrent File</label>
+                            <div class="input-group">
+                                <input type="file" class="form-control" id="torrentFile" name="torrent_file" accept=".torrent" onchange="toggleInput('magnetLink', this)">
+                                <button class="btn btn-outline-secondary" type="button" onclick="document.getElementById('torrentFile').value=''">Remove</button>
+                            </div>
+                        </div>
+
+                    </div>
+                    <!-- Scrapy Parameters -->
+                    <div id="scrapyParameters" style="display: none;">
+                        <div class="mb-3">
+                            <label for="spiderName" class="form-label">Spider Name</label>
+                            <select class="form-select" id="spiderName" name="spider_name">
+                                {% for spider_id, spider_name in scrapy_spiders %}
+                                    <option value="{{ spider_id }}">{{ spider_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <!-- Additional Parameters based on Spider Selection -->
+                        <div id="tamilmvTamilblastersParams" style="display: none;" class="mb-3 mt-4">
+                            <label><input type="radio" name="mode" value="page_scraping" onchange="toggleModeSpecificFields()"> Page Scraping</label>
+                            <label><input type="radio" name="mode" value="keyword_search" checked onchange="toggleModeSpecificFields()"> Keyword Search</label>
+
+                            <!-- Keyword Search Input -->
+                            <div id="keywordSearchInput" class="mb-3" style="display: none;">
+                                <label for="keyword" class="form-label">Search Keyword</label>
+                                <input type="text" class="form-control" id="keyword" name="search_keyword">
+                            </div>
+
+                            <!-- Page Scraping Input -->
+                            <div id="pageScrapingInput" class="mb-3" style="display: none;">
+                                <label for="pages" class="form-label">Number of Pages</label>
+                                <input type="number" class="form-control" id="pages" name="pages" value="1">
+                                <label for="startPage" class="form-label">Start Page</label>
+                                <input type="number" class="form-control" id="startPage" name="start_page" value="1">
+
+                                <!-- Scrap Catalog ID Dropdown -->
+                                <label for="scrapCatalogId" class="form-label">Scrap Catalog ID</label>
+                                <select class="form-select" id="scrapCatalogId" name="scrap_catalog_id">
+                                    <option value="all">All</option>
+                                    <option value="tamil_hdrip">Tamil HDRip</option>
+                                    <option value="tamil_tcrip">Tamil TCrip</option>
+                                    <option value="tamil_dubbed">Tamil Dubbed</option>
+                                    <option value="tamil_series">Tamil Series</option>
+                                    <option value="malayalam_hdrip">Malayalam HDRip</option>
+                                    <option value="malayalam_tcrip">Malayalam TCrip</option>
+                                    <option value="malayalam_dubbed">Malayalam Dubbed</option>
+                                    <option value="malayalam_series">Malayalam Series</option>
+                                    <option value="telugu_tcrip">Telugu TCrip</option>
+                                    <option value="telugu_hdrip">Telugu HDRip</option>
+                                    <option value="telugu_dubbed">Telugu Dubbed</option>
+                                    <option value="telugu_series">Telugu Series</option>
+                                    <option value="hindi_tcrip">Hindi TCrip</option>
+                                    <option value="hindi_hdrip">Hindi HDRip</option>
+                                    <option value="hindi_dubbed">Hindi Dubbed</option>
+                                    <option value="hindi_series">Hindi Series</option>
+                                    <option value="kannada_tcrip">Kannada TCrip</option>
+                                    <option value="kannada_hdrip">Kannada HDRip</option>
+                                    <option value="kannada_series">Kannada Series</option>
+                                    <option value="english_tcrip">English TCrip</option>
+                                    <option value="english_hdrip">English HDRip</option>
+                                    <option value="english_series">English Series</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="scrapeAllOption" class="mb-3" style="display: none;">
+                            <label><input type="checkbox" name="scrape_all" id="scrape_all"> Scrape All Pages</label>
+                        </div>
+                    </div>
+                    <!-- TV Metadata Input -->
+                    <div id="tvMetadataInput" style="display: none;">
+                        <h4 class="section-header">TV Metadata Input</h4>
+                        <hr class="section-divider">
+                        <div class="mb-3">
+                            <label for="title" class="form-label">Title</label>
+                            <input type="text" class="form-control" id="title" name="title" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="poster" class="form-label">Poster URL (Optional)</label>
+                            <input type="url" class="form-control" id="poster" name="poster">
+                        </div>
+                        <div class="mb-3">
+                            <label for="logo" class="form-label">Logo URL (Optional)</label>
+                            <input type="url" class="form-control" id="logo" name="logo">
+                        </div>
+                        <div class="mb-3">
+                            <label for="background" class="form-label">Background URL (Optional)</label>
+                            <input type="url" class="form-control" id="background" name="background">
+                        </div>
+                        <div class="mb-3">
+                            <label for="country" class="form-label">Country (Optional)</label>
+                            <input type="text" class="form-control" id="country" name="country">
+                        </div>
+                        <div class="mb-3">
+                            <label for="language" class="form-label">Language (Optional)</label>
+                            <input type="text" class="form-control" id="language" name="language">
+                        </div>
+                        <div class="mb-3">
+                            <label for="genreInput" class="form-label">Genres (Optional)</label>
+                            <div id="genreInputs" class="mb-2"></div>
+                            <input type="text" class="form-control mb-2" id="genreInput" placeholder="Add genre">
+                            <button type="button" class="btn btn-secondary" onclick="addGenre()">Add Genre</button>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Streams</label>
+                            <div id="streamInputs"></div>
+                            <button type="button" class="btn btn-primary" onclick="addStreamInput()">Add Stream</button>
+                        </div>
+                    </div>
+                    <div id="m3uPlaylistInput" style="display: none;">
+                        <div class="mb-3">
+                            <div>
+                                <label><input type="radio" name="m3uInputType" value="url" checked> M3U Playlist URL</label>
+                                <label><input type="radio" name="m3uInputType" value="file"> Upload M3U File</label>
+                            </div>
+                        </div>
+                        <div class="mb-3" id="m3uPlaylistUrlInput">
+                            <label for="m3uPlaylistUrl" class="form-label">M3U Playlist URL</label>
+                            <input type="url" class="form-control" id="m3uPlaylistUrl" name="m3uPlaylistUrl">
+                        </div>
+                        <div class="mb-3" id="m3uPlaylistFileInput" style="display: none;">
+                            <label for="m3uPlaylistFile" class="form-label">Upload M3U File</label>
+                            <input type="file" class="form-control" id="m3uPlaylistFile" name="m3uPlaylistFile" accept=".m3u">
+                        </div>
+                        <div class="mb-3">
+                            <label for="m3uPlaylistSource" class="form-label">Playlist Source Name</label>
+                            <input type="text" class="form-control" id="m3uPlaylistSource" name="m3uPlaylistSource">
+                        </div>
+                    </div>
+                    <!-- IMDb Data Update Parameters -->
+                    <div id="imdbDataParameters" style="display: none;">
+                        <div class="mb-3">
+                            <label for="imdbId" class="form-label">IMDb ID</label>
+                            <input type="text" class="form-control" id="imdbId" name="imdb_id" placeholder="Enter IMDb ID (e.g., tt1234567)">
+                        </div>
+                    </div>
+
+                    <div id="blockTorrentParameters" style="display: none;">
+                        <div class="mb-3">
+                            <label for="blockTorrentInfoHash" class="form-label">Torrent Info Hash</label>
+                            <input type="text" class="form-control" id="blockTorrentInfoHash" name="blockTorrentInfoHash" required>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- API Password Configuration -->
+            <input type="hidden" id="apiPasswordEnabled" value="{{ api_password_enabled }}">
+            <div id="apiPasswordContainer" class="section-container" style="display: none;">
+                <h4 class="section-header">API Security Configuration</h4>
+                <hr class="section-divider">
+                <div class="mb-3">
+                    <label for="api_password">API Password:</label>
+                    <div class="input-group">
+                        <input class="form-control" type="password" id="api_password" name="api_password" placeholder="Enter API Password">
+                        <button class="btn btn-outline-secondary" type="button" id="toggleApiPassword">
+                            <span id="toggleApiPasswordIcon" class="bi bi-eye"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="button-container mt-5">
+                <button type="button" class="btn btn-primary" id="submitBtn" onclick="submitScraperForm()">Run</button>
+                <div id="loadingSpinner" class="spinner-border text-primary" role="status" style="display: none;">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JS for Bootstrap -->
+<script src="/static/js/jquery-3.6.0.min.js"></script>
+<script src="/static/js/popper.min.js"></script>
+<script src="/static/js/bootstrap.min.js"></script>
+<script src="/static/js/toastr.min.js"></script>
+<script src="/static/js/scraperControl.js"></script>
+</body>
+
+</html>
